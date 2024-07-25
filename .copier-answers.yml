@@ -1,0 +1,8 @@
+# Changes here will be overwritten by Copier
+_commit: v0.3.3
+_src_path: gh:LSSTDESC/RAIL-project-template
+author_email: yashraj.bains@sjsu.edu
+author_name: Yashraj Bains
+create_example_module: false
+package_name: pz_analysis
+project_name: pz_analysis
