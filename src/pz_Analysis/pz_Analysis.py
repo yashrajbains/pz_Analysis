@@ -106,7 +106,7 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    testFile = yf.convert_df(testFile)
+    testFile = convert_df(testFile)
 
     bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
     testFile["band_bin"] = pd.cut(testFile[band_name], bins)
@@ -172,7 +172,7 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    reference = yf.convert_df(reference)
+    reference = convert_df(reference)
 
     band1, band2 = color.split('-')
     reference['color'] = reference[f'LSST_obs_{band1}'] - reference[f'LSST_obs_{band2}']
@@ -241,7 +241,7 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     if isinstance(flavors, str):
         flavors = [flavors]
 
-    testFile = yf.convert_df(testFile)
+    testFile = convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) for flavor in flavors]    
@@ -317,7 +317,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    testFile = yf.convert_df(testFile)
+    testFile = convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) 
