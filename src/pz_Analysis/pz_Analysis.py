@@ -46,6 +46,48 @@ def convert_df(test_file):
     pd.set_option("display.max_columns", None)
     return df
 
+def create_ensemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
+    widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
+    pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
+    
+    wide = convert_df(widepath)
+    testing = convert_df(testFile)
+
+    testing['cells'] = wide['cells']
+
+    grid = np.linspace(zmin, zmax, nzbins)
+
+    with h5py.File(pz_chat_path, 'r') as f:
+        pz_chat_data = f['pz_chat']
+        estimated_redshifts = []
+        for cell in testing['cells']:
+            cell_data = pz_chat_data[int(cell)][:]
+            estimated_redshift = grid[np.argmax(cell_data)]
+            estimated_redshifts.append(estimated_redshift)
+        testing['estimated_redshift'] = estimated_redshifts
+        estimated_redshifts = np.array(estimated_redshifts)
+    
+    if estimated_redshifts.ndim == 1:
+        estimated_redshifts = estimated_redshifts[:, np.newaxis]
+
+    z_grid = np.linspace(zmin, zmax, nzbins)
+
+    histograms = []
+    for redshift in estimated_redshifts:
+        hist, _ = np.histogram(redshift, bins=z_grid, density=True)
+        histograms.append(hist)
+
+    histograms = np.array(histograms)
+
+    ensemble = qp.Ensemble(gen_func=qp.hist, data=dict(bins=z_grid, pdfs=histograms))
+
+    zmode_values = estimated_redshifts.max(axis=1)
+    ensemble.set_ancil(dict(zmode=zmode_values))
+    ensemble.write_to(f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_som.hdf5')
+    
+    return ensemble
+
+
 def zrelation(testFile, flavor, selection):
     """
     2-D Histogram: Estimated Redshift vs True Redshift
@@ -53,10 +95,13 @@ def zrelation(testFile, flavor, selection):
     reference = convert_df(testFile)
 
     algorithm = algorithm_flavor(flavor)
-
-    outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
-
-    estimate = qp.read(outputFile_path)
+    
+    if algorithm == 'som':
+        ensemble = create_ensemble(testFile, flavor, selection)
+        estimate = ensemble
+    else:
+        outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+        estimate = qp.read(outputFile_path)
 
     plt.scatter(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), s=1)
     plt.xlabel("True Redshift")
@@ -66,7 +111,6 @@ def zrelation(testFile, flavor, selection):
     plt.hist2d(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), bins=100, norm="log")
     plt.xlabel("True Redshift")
     plt.ylabel("Estimated Redshift")
-    #plt.gca().set_aspect('1.0')
     plt.title(f"{algorithm}")
     
     components = flavor.split('_')
@@ -85,6 +129,9 @@ def zrelation(testFile, flavor, selection):
     save_path = os.path.join(dir_path, "zrelation.png")
     plt.savefig(save_path)
     plt.show()
+    
+    if algorithm == 'som':
+        print(ensemble.ancil)
 
 def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05):
     """
