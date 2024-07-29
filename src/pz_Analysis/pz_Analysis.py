@@ -7,6 +7,7 @@ import pandas as pd
 import tables_io
 from collections import OrderedDict
 import qp
+import h5py
 
 def algorithm_flavor(flavor):
     """
@@ -15,8 +16,8 @@ def algorithm_flavor(flavor):
     prefix = flavor.split('_')[0]
     return 'fzboost' if prefix == 'fzb' else prefix
 
-def convert_df(test_file):
-    """Read test file and convert to pandas DataFrame"""
+def convert_df(testFile):
+    """Convert testFile path to pandas DataFrame"""
 
     def convert_ordereddict_to_dataframe(odict):
         """Convert nested OrderedDict to pandas DataFrame"""
@@ -33,7 +34,7 @@ def convert_df(test_file):
                 flat_dict[key] = value
         return pd.DataFrame(flat_dict)
 
-    data = tables_io.read(test_file)
+    data = tables_io.read(testFile)
 
     if isinstance(data, OrderedDict):
         if "photometry" in data:
@@ -46,7 +47,7 @@ def convert_df(test_file):
     pd.set_option("display.max_columns", None)
     return df
 
-def create_ensemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
+def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
     pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
     
@@ -87,7 +88,6 @@ def create_ensemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     
     return ensemble
 
-
 def zrelation(testFile, flavor, selection):
     """
     2-D Histogram: Estimated Redshift vs True Redshift
@@ -95,13 +95,10 @@ def zrelation(testFile, flavor, selection):
     reference = convert_df(testFile)
 
     algorithm = algorithm_flavor(flavor)
-    
-    if algorithm == 'som':
-        ensemble = create_ensemble(testFile, flavor, selection)
-        estimate = ensemble
-    else:
-        outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
-        estimate = qp.read(outputFile_path)
+
+    outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+
+    estimate = qp.read(outputFile_path)
 
     plt.scatter(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), s=1)
     plt.xlabel("True Redshift")
@@ -111,6 +108,7 @@ def zrelation(testFile, flavor, selection):
     plt.hist2d(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), bins=100, norm="log")
     plt.xlabel("True Redshift")
     plt.ylabel("Estimated Redshift")
+    #plt.gca().set_aspect('1.0')
     plt.title(f"{algorithm}")
     
     components = flavor.split('_')
@@ -129,29 +127,15 @@ def zrelation(testFile, flavor, selection):
     save_path = os.path.join(dir_path, "zrelation.png")
     plt.savefig(save_path)
     plt.show()
-    
-    if algorithm == 'som':
-        print(ensemble.ancil)
 
 def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05):
     """
     Redshift Estimator Accuracy vs Mag for multiple flavors/algorithms 
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    from rail.utils import catalog_utils
-    from rail.core.stage import RailStage
-    import tables_io
-    import os
-
-    algorithms = [algorithm_flavor(flavor) for flavor in flavors]
-    
     if isinstance(flavors, str):
         flavors = [flavors]
-    if isinstance(algorithms, str):
-        algorithms = [algorithms]
+
+    algorithms = [algorithm_flavor(flavor) for flavor in flavors]
 
     testFile = convert_df(testFile)
 
@@ -161,11 +145,45 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
     plt.figure(figsize=(10, 6))
 
     for flavor, algorithm in zip(flavors, algorithms):
-        file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+        if algorithm == 'som':
+            wide_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
+            wide = convert_df(wide_path)
+            testFile['cells'] = wide['cells']
 
-        outputFile = qp.read(file_path)
+            pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
+            grid = np.linspace(0, 6, 601)
+            estimated_redshifts = []
 
-        testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
+            with h5py.File(pz_chat_path, 'r') as f:
+                for cell in testFile['cells']:
+                    cell_data = f['pz_chat'][int(cell)][:]
+                    estimated_redshift = grid[np.argmax(cell_data)]
+                    estimated_redshifts.append(estimated_redshift)
+
+            estimated_redshifts = np.array(estimated_redshifts)
+
+            if estimated_redshifts.ndim == 1:
+                estimated_redshifts = estimated_redshifts[:, np.newaxis]
+
+            z_grid = np.linspace(0, 6, 601)
+            histograms = []
+
+            for redshift in estimated_redshifts:
+                hist, _ = np.histogram(redshift, bins=z_grid, density=True)
+                histograms.append(hist)
+
+            histograms = np.array(histograms)
+
+            ensemble = qp.Ensemble(gen_func=qp.hist, data=dict(bins=z_grid, pdfs=histograms))
+            zmode_values = estimated_redshifts.max(axis=1)
+            ensemble.set_ancil(dict(zmode=zmode_values))
+
+            testFile['estimated_redshift'] = np.squeeze(ensemble.ancil['zmode'])
+        else:
+            file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+            outputFile = qp.read(file_path)
+            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
+
         accuracy = testFile.groupby('band_bin').apply(
             lambda x: np.mean(np.abs(x['redshift'] - x['estimated_redshift']) <= threshold)
         )
@@ -185,33 +203,27 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
         dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
         os.makedirs(dir_path, exist_ok=True)
 
-        #save_path = os.path.join(dir_path, "accuracy.png")
         plt.xlabel(f"Magnitude: {band_name}")
         plt.ylabel("Redshift Estimator Accuracy")
-        plt.title(f"Comparing {algorithm} Flavors")
+        #plt.title(f"Comparing {algorithm} Flavors")
         plt.grid()
         plt.legend()
         plt.ylim(0,1)
-        #plt.savefig(save_path)
-    
+
     plt.xlabel(f"Magnitude: {band_name}")
     plt.ylabel("Redshift Estimator Accuracy")
-    plt.title(f"Comparing Different Flavors and Algorithms")
+    #plt.title(f"Comparing Different Flavors and Algorithms")
     plt.grid()
     plt.legend()
     plt.ylim(0,1)
     plt.show()
-    
+
+
 def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     """
     Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms 
     **Allow for different color bands soon**
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    import os
 
     algorithms = [algorithm_flavor(flavor) for flavor in flavors]
     if isinstance(flavors, str):
@@ -428,27 +440,6 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
 
 
 
-def estimator_acc(reference, estimate, band_name, threshold, algo_name):
-    """Plot the accuracy of the redshift estimator as a function of chosen magnitude band"""
-    reference["estimated_redshift"] = np.squeeze(estimate.ancil["zmode"])
-
-    bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
-    reference["band_bin"] = pd.cut(reference[band_name], bins)
-
-    accuracy = reference.groupby("band_bin").apply(
-        lambda x: np.mean(np.abs(x["redshift"] - x["estimated_redshift"]) <= threshold)
-    )
-
-    error = np.sqrt(accuracy * (1 - accuracy) / reference["band_bin"].value_counts())
-
-    plt.errorbar(bins[:-1], accuracy, yerr=error, capsize=5)
-    plt.xlabel(f"Magnitude: {band_name}")
-    plt.ylabel("Redshift Estimator Accuracy")
-    plt.title(f"{algo_name}")
-    plt.grid()
-    plt.savefig(f"{algo_name} Estimator Accuracy")
-    plt.show()
-    return accuracy.mean()
 
 
 def redshiftstd(reference, estimate, band_name, algo_name):
@@ -559,90 +550,6 @@ def inform_estimate_z(
     end_time = time.time()
     total_time = end_time - start_time
     return output, total_time
-
-def analyze_output(testFile, flavors, selection, algorithm, band_name='LSST_obs_g', threshold=0.05):
-    """
-    Analyze Parameter Outputs based on different flavors and a specified algorithm
-    """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    from rail.utils import catalog_utils
-    from rail.core.stage import RailStage
-    import tables_io
-    
-    if isinstance(flavors, str):
-        flavors = [flavors]
-
-    # Convert the test file data frame if necessary
-    testFile = convert_df(testFile)
-    
-    # Generate file paths
-    base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
-    file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) for flavor in flavors]    
-
-    # Load output files
-    outputFiles = [qp.read(file_path) for file_path in file_paths]
-    
-    algo_names = flavors
-
-    # Define bins
-    bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
-    testFile["band_bin"] = pd.cut(testFile[band_name], bins)
-
-    # Calculate accuracy for each flavor and plot results
-    for outputFile, flavor in zip(outputFiles, flavors):
-        testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
-        accuracy = testFile.groupby('band_bin').apply(
-            lambda x: np.mean(np.abs(x['redshift'] - x['estimated_redshift']) <= threshold)
-        )
-        error = np.sqrt(accuracy * (1 - accuracy) / testFile['band_bin'].value_counts())
-        plt.errorbar(bins[:-1], accuracy, yerr=error, capsize=5, label=flavor)
-        components = flavor.split('_')
-        algorithm_name = components[0]
-
-        # Ensure components have the expected length
-        if len(components) == 3:
-            subdir_name = components[1]
-            flavor_name = components[2]
-        else:
-            raise ValueError("The flavor string does not match the expected format.")
-
-        base_dir = 'resultsShare'
-        # Create the directory if it doesn't exist, including subdir
-        dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
-        os.makedirs(dir_path, exist_ok=True)
-
-        # Save the figure
-        save_path = os.path.join(dir_path, "accuracy.png")
-        plt.xlabel(f"Magnitude: {band_name}")
-        plt.ylabel("Redshift Estimator Accuracy")
-        plt.title(f"Comparing {algorithm} Flavors")
-        plt.grid()
-        plt.legend()
-        plt.ylim(0,1)
-        plt.savefig(save_path)
-
-    plt.xlabel(f"Magnitude: {band_name}")
-    plt.ylabel("Redshift Estimator Accuracy")
-    plt.title(f"Comparing {algorithm} Flavors")
-    plt.grid()
-    plt.legend()
-    plt.ylim(0,1)
-    plt.show()
-
-
-truth_template = "/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/true_NZ_true_nz_{classifier}_bin{ibin}.hdf5"
-est_template = "/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/single_NZ_summarize_{classifier}_bin{ibin}_{summarizer}.hdf5"
-
-colors = {
-    0: 'blue',
-    1: 'green',
-    2: 'red',
-    3: 'cyan',
-    4: 'black',
-}
 
 
 def compare_bins_true(selection, flavor, classifier='uniform_binning', summarizer='naive_stack'):
@@ -797,7 +704,6 @@ def output_metric(testFile, flavor, selection, algorithm, band_name='LSST_obs_g'
     components = flavor.split('_')
     algorithm_name = components[0]
 
-    # Ensure components have the expected length
     if len(components) == 3:
         subdir_name = components[1]
         flavor_name = components[2]
@@ -805,11 +711,9 @@ def output_metric(testFile, flavor, selection, algorithm, band_name='LSST_obs_g'
         raise ValueError("The flavor string does not match the expected format.")
 
     base_dir = 'resultsShare'
-    # Create the directory if it doesn't exist, including subdir
     dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
     os.makedirs(dir_path, exist_ok=True)
 
-    # Save the figure
     save_path = os.path.join(dir_path, "outputMetric.png")
     plt.title(f"{algorithm_name}: {flavor} Output Metric")
     plt.grid()
@@ -830,7 +734,6 @@ def output_metric2(testFile, flavors, selection, algorithms, band_name='LSST_obs
     if isinstance(testFile, str):
         testFile = convert_df(testFile)
     
-    # Define bins
     bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
     testFile["band_bin"] = pd.cut(testFile[band_name], bins)
     
