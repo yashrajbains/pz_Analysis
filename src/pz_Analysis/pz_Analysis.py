@@ -231,7 +231,7 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    reference = convert_df(reference)
+    reference = yf.convert_df(reference)
 
     band1, band2 = color.split('-')
     reference['color'] = reference[f'LSST_obs_{band1}'] - reference[f'LSST_obs_{band2}']
@@ -300,7 +300,7 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     if isinstance(flavors, str):
         flavors = [flavors]
 
-    testFile = convert_df(testFile)
+    testFile = yf.convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) for flavor in flavors]    
@@ -376,7 +376,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    testFile = convert_df(testFile)
+    testFile = yf.convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) 
