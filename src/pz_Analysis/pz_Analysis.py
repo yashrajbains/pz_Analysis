@@ -7,6 +7,7 @@ import pandas as pd
 import tables_io
 from collections import OrderedDict
 import qp
+import h5py
 
 def algorithm_flavor(flavor):
     """
@@ -15,8 +16,8 @@ def algorithm_flavor(flavor):
     prefix = flavor.split('_')[0]
     return 'fzboost' if prefix == 'fzb' else prefix
 
-def convert_df(test_file):
-    """Read test file and convert to pandas DataFrame"""
+def convert_df(testFile):
+    """Convert testFile path to pandas DataFrame"""
 
     def convert_ordereddict_to_dataframe(odict):
         """Convert nested OrderedDict to pandas DataFrame"""
@@ -33,7 +34,7 @@ def convert_df(test_file):
                 flat_dict[key] = value
         return pd.DataFrame(flat_dict)
 
-    data = tables_io.read(test_file)
+    data = tables_io.read(testFile)
 
     if isinstance(data, OrderedDict):
         if "photometry" in data:
@@ -46,7 +47,7 @@ def convert_df(test_file):
     pd.set_option("display.max_columns", None)
     return df
 
-def create_ensemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
+def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
     pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
     
@@ -87,7 +88,6 @@ def create_ensemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     
     return ensemble
 
-
 def zrelation(testFile, flavor, selection):
     """
     2-D Histogram: Estimated Redshift vs True Redshift
@@ -95,13 +95,10 @@ def zrelation(testFile, flavor, selection):
     reference = convert_df(testFile)
 
     algorithm = algorithm_flavor(flavor)
-    
-    if algorithm == 'som':
-        ensemble = create_ensemble(testFile, flavor, selection)
-        estimate = ensemble
-    else:
-        outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
-        estimate = qp.read(outputFile_path)
+
+    outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+
+    estimate = qp.read(outputFile_path)
 
     plt.scatter(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), s=1)
     plt.xlabel("True Redshift")
@@ -111,6 +108,7 @@ def zrelation(testFile, flavor, selection):
     plt.hist2d(reference["redshift"], np.squeeze(estimate.ancil["zmode"]), bins=100, norm="log")
     plt.xlabel("True Redshift")
     plt.ylabel("Estimated Redshift")
+    #plt.gca().set_aspect('1.0')
     plt.title(f"{algorithm}")
     
     components = flavor.split('_')
@@ -129,29 +127,15 @@ def zrelation(testFile, flavor, selection):
     save_path = os.path.join(dir_path, "zrelation.png")
     plt.savefig(save_path)
     plt.show()
-    
-    if algorithm == 'som':
-        print(ensemble.ancil)
 
 def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05):
     """
     Redshift Estimator Accuracy vs Mag for multiple flavors/algorithms 
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    from rail.utils import catalog_utils
-    from rail.core.stage import RailStage
-    import tables_io
-    import os
-
-    algorithms = [algorithm_flavor(flavor) for flavor in flavors]
-    
     if isinstance(flavors, str):
         flavors = [flavors]
-    if isinstance(algorithms, str):
-        algorithms = [algorithms]
+
+    algorithms = [algorithm_flavor(flavor) for flavor in flavors]
 
     testFile = convert_df(testFile)
 
@@ -161,11 +145,45 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
     plt.figure(figsize=(10, 6))
 
     for flavor, algorithm in zip(flavors, algorithms):
-        file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+        if algorithm == 'som':
+            wide_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
+            wide = convert_df(wide_path)
+            testFile['cells'] = wide['cells']
 
-        outputFile = qp.read(file_path)
+            pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
+            grid = np.linspace(0, 6, 601)
+            estimated_redshifts = []
 
-        testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
+            with h5py.File(pz_chat_path, 'r') as f:
+                for cell in testFile['cells']:
+                    cell_data = f['pz_chat'][int(cell)][:]
+                    estimated_redshift = grid[np.argmax(cell_data)]
+                    estimated_redshifts.append(estimated_redshift)
+
+            estimated_redshifts = np.array(estimated_redshifts)
+
+            if estimated_redshifts.ndim == 1:
+                estimated_redshifts = estimated_redshifts[:, np.newaxis]
+
+            z_grid = np.linspace(0, 6, 601)
+            histograms = []
+
+            for redshift in estimated_redshifts:
+                hist, _ = np.histogram(redshift, bins=z_grid, density=True)
+                histograms.append(hist)
+
+            histograms = np.array(histograms)
+
+            ensemble = qp.Ensemble(gen_func=qp.hist, data=dict(bins=z_grid, pdfs=histograms))
+            zmode_values = estimated_redshifts.max(axis=1)
+            ensemble.set_ancil(dict(zmode=zmode_values))
+
+            testFile['estimated_redshift'] = np.squeeze(ensemble.ancil['zmode'])
+        else:
+            file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+            outputFile = qp.read(file_path)
+            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
+
         accuracy = testFile.groupby('band_bin').apply(
             lambda x: np.mean(np.abs(x['redshift'] - x['estimated_redshift']) <= threshold)
         )
@@ -185,33 +203,27 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
         dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
         os.makedirs(dir_path, exist_ok=True)
 
-        #save_path = os.path.join(dir_path, "accuracy.png")
         plt.xlabel(f"Magnitude: {band_name}")
         plt.ylabel("Redshift Estimator Accuracy")
-        plt.title(f"Comparing {algorithm} Flavors")
+        #plt.title(f"Comparing {algorithm} Flavors")
         plt.grid()
         plt.legend()
         plt.ylim(0,1)
-        #plt.savefig(save_path)
-    
+
     plt.xlabel(f"Magnitude: {band_name}")
     plt.ylabel("Redshift Estimator Accuracy")
-    plt.title(f"Comparing Different Flavors and Algorithms")
+    #plt.title(f"Comparing Different Flavors and Algorithms")
     plt.grid()
     plt.legend()
     plt.ylim(0,1)
     plt.show()
-    
+
+
 def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     """
     Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms 
     **Allow for different color bands soon**
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    import os
 
     algorithms = [algorithm_flavor(flavor) for flavor in flavors]
     if isinstance(flavors, str):
@@ -219,7 +231,7 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    reference = convert_df(reference)
+    reference = yf.convert_df(reference)
 
     band1, band2 = color.split('-')
     reference['color'] = reference[f'LSST_obs_{band1}'] - reference[f'LSST_obs_{band2}']
@@ -288,7 +300,7 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     if isinstance(flavors, str):
         flavors = [flavors]
 
-    testFile = convert_df(testFile)
+    testFile = yf.convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) for flavor in flavors]    
@@ -364,7 +376,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    testFile = convert_df(testFile)
+    testFile = yf.convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) 
