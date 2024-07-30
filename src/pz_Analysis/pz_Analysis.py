@@ -1,4 +1,4 @@
-"""Importing relevant modules"""
+"""Importing modules"""
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -48,6 +48,9 @@ def convert_df(testFile):
     return df
 
 def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
+    """
+    Create p(z) ensemble from sompz output files. Save to path for compatibility with functions. 
+    """
     widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
     pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
     
@@ -222,7 +225,6 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
 def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     """
     Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms 
-    **Allow for different color bands soon**
     """
 
     algorithms = [algorithm_flavor(flavor) for flavor in flavors]
@@ -231,7 +233,7 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    reference = yf.convert_df(reference)
+    reference = convert_df(reference)
 
     band1, band2 = color.split('-')
     reference['color'] = reference[f'LSST_obs_{band1}'] - reference[f'LSST_obs_{band2}']
@@ -285,7 +287,7 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
 
 def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05, frac=0.1):
     """
-    r-i vs g-r, Filter dataset to points with bias greater than threshold. Downsample remaining dataset by frac. 
+    Plot r-i vs g-r, Filter dataset to points with bias greater than threshold. Downsample remaining dataset by frac. 
     """
     import numpy as np
     import pandas as pd
@@ -300,7 +302,7 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     if isinstance(flavors, str):
         flavors = [flavors]
 
-    testFile = yf.convert_df(testFile)
+    testFile = convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) for flavor in flavors]    
@@ -312,17 +314,17 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     fig, ax = plt.subplots()
 
     cdict = {
-        'red':   ((0.0, 1.0, 1.0),   # At 0, red is 1.0 (full intensity)
-                  (0.5, 0.0, 0.0),   # At 0.5, red is 0.0
-                  (1.0, 1.0, 1.0)),  # At 1.0, red is 1.0
+        'red':   ((0.0, 1.0, 1.0),
+                  (0.5, 0.0, 0.0),
+                  (1.0, 1.0, 1.0)),
 
-        'green': ((0.0, 0.0, 0.0),   # At 0, green is 0.0
-                  (0.5, 1.0, 1.0),   # At 0.5, green is 1.0 (full intensity)
-                  (1.0, 0.0, 0.0)),  # At 1.0, green is 0.0
+        'green': ((0.0, 0.0, 0.0),
+                  (0.5, 1.0, 1.0),
+                  (1.0, 0.0, 0.0)),
 
-        'blue':  ((0.0, 0.0, 0.0),   # At 0, blue is 0.0
-                  (0.5, 0.0, 0.0),   # At 0.5, blue is 0.0
-                  (1.0, 0.0, 0.0))   # At 1.0, blue is 0.0
+        'blue':  ((0.0, 0.0, 0.0),
+                  (0.5, 0.0, 0.0),
+                  (1.0, 0.0, 0.0))
     }
     cmap = LinearSegmentedColormap('RedGreenRed', cdict)
 
@@ -376,7 +378,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     if isinstance(algorithms, str):
         algorithms = [algorithms]
 
-    testFile = yf.convert_df(testFile)
+    testFile = convert_df(testFile)
     
     base_path = '/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
     file_paths = [base_path.format(selection=selection, flavor=flavor, algorithm=algorithm) 
@@ -424,419 +426,3 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     ax.grid()
     ax.legend()
     plt.show()
-
-# Functions above have been tested, below need work
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def redshiftstd(reference, estimate, band_name, algo_name):
-    """Plot the standard deviation of redshift estimation as function of chosen mag band"""
-    reference["estimated_redshift"] = np.squeeze(estimate.ancil["zmode"])
-
-    bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
-    reference["band_bin"] = pd.cut(reference[band_name], bins)
-
-    std = reference.groupby("band_bin").apply(
-        lambda x: np.std(x["redshift"] - x["estimated_redshift"])
-    )
-    count = reference.groupby("band_bin").size()
-
-    std_error = std / np.sqrt(count)
-
-    plt.errorbar(bins[:-1], std, yerr=std_error, capsize=5)
-    plt.xlabel(f"Magnitude: {band_name}")
-    plt.ylabel("Standard Deviation")
-    plt.title(f"{algo_name}")
-    plt.grid
-    plt.savefig(f"{algo_name} STD")
-    plt.show()
-
-
-def redshiftbias(pdtable, pz, band_name, binrange):
-    """Plot redshift bias as a function of chose mag band"""
-    pdtable["mode"] = np.squeeze(pz.ancil["mode"])
-
-    bins = binrange
-    pdtable["band_bin"] = pd.cut(pdtable[band_name], bins)
-
-    bias = pdtable.groupby("band_bin").apply(
-        lambda x: np.mean(x["redshift"] - x["mode"])
-    )
-
-    plt.plot(bins[:-1], bias)
-    plt.xlabel(f"{band_name} Magnitude")
-    plt.ylabel("Bias")
-    plt.title(f"Bias vs. {band_name} Magnitude")
-    plt.grid()
-
-
-def inform_estimate_z(
-    model_name, trainFile, testFile, training_data, test_data, model_dict={}
-):
-    """Inform model and estimate redshift."""
-    import qp
-    import time
-    from rail.stages import import_and_attach_all
-    from rail.estimation.algos.train_z import TrainZInformer, TrainZEstimator
-    from rail.estimation.algos.sklearn_neurnet import (
-        SklNeurNetInformer,
-        SklNeurNetEstimator,
-    )
-    from rail.estimation.algos.k_nearneigh import (
-        KNearNeighInformer,
-        KNearNeighEstimator,
-    )
-    from rail.estimation.algos.flexzboost import FlexZBoostInformer, FlexZBoostEstimator
-    from rail.estimation.algos.bpz_lite import BPZliteInformer, BPZliteEstimator
-    from rail.estimation.algos.gpz import GPzInformer, GPzEstimator
-    from rail.estimation.algos.tpz_lite import TPZliteInformer, TPZliteEstimator
-    from rail.estimation.algos.lephare import LephareInformer, LephareEstimator
-
-    ALL_ALGORITHMS = {
-        "train_z": {"Inform": TrainZInformer, "Estimate": TrainZEstimator},
-        "simplenn": {"Inform": SklNeurNetInformer, "Estimate": SklNeurNetEstimator},
-        "knn": {"Inform": KNearNeighInformer, "Estimate": KNearNeighEstimator},
-        "fzboost": {"Inform": FlexZBoostInformer, "Estimate": FlexZBoostEstimator},
-        "bpz": {"Inform": BPZliteInformer, "Estimate": BPZliteEstimator},
-        "gpz": {"Inform": GPzInformer, "Estimate": GPzEstimator},
-        "tpz": {"Inform": TPZliteInformer, "Estimate": TPZliteEstimator},
-        "lephare": {"Inform": LephareInformer, "Estimate": LephareEstimator},
-    }
-
-    InformerClass = ALL_ALGORITHMS[f"{model_name}"]["Inform"]
-    EstimatorClass = ALL_ALGORITHMS[f"{model_name}"]["Estimate"]
-
-    inform_dict = model_dict.get('inform', {})
-    estimate_dict = model_dict.get('estimate', {})
-
-    start_time = time.time()
-
-    pz_train = InformerClass.make_stage(
-        name=f"inform_{model_name}", model=f"demo_{model_name}.pkl", hdf5_groupname = '', **inform_dict
-    )
-    pz_train.config
-
-    pz_train.inform(training_data)
-
-    modelhandle = pz_train.get_handle("model")  # This is the data that it trained
-    modelhandle.path
-
-    pz = EstimatorClass.make_stage(
-        name=f"{model_name}",
-        hdf5_groupname='',
-        model=pz_train.get_handle("model"), **estimate_dict,
-    )
-    results = pz.estimate(test_data)
-    results = pz.get_handle("output")
-    results.data
-    results.data.npdf
-    results.path
-    output = qp.read(results.path)
-    output
-
-    end_time = time.time()
-    total_time = end_time - start_time
-    return output, total_time
-
-
-def compare_bins_true(selection, flavor, classifier='uniform_binning', summarizer='naive_stack'):
-    fig = plt.figure()
-    grid = np.linspace(0, 3., 301)
-    for ibin in range(5):
-        truth_file = truth_template.format(selection=selection, flavor=flavor, classifier=classifier, ibin=ibin)
-        est_file = est_template.format(selection=selection, flavor=flavor, classifier=classifier, summarizer=summarizer, ibin=ibin)
-        truth_ens = qp.read(truth_file)
-        est_ens = qp.read(est_file)
-        
-        plt.plot(grid, np.squeeze(truth_ens.pdf(grid)), color=colors[ibin], linestyle='dashed')
-        #plt.plot(grid, np.squeeze(est_ens.pdf(grid)), color=colors[ibin])
-        
-    plt.grid()
-    return fig
-
-def compare_bins_est(selection, flavor, classifier='uniform_binning', summarizer='naive_stack'):
-    fig = plt.figure()
-    grid = np.linspace(0, 3., 301)
-    for ibin in range(5):
-        truth_file = truth_template.format(selection=selection, flavor=flavor, classifier=classifier, ibin=ibin)
-        est_file = est_template.format(selection=selection, flavor=flavor, classifier=classifier, summarizer=summarizer, ibin=ibin)
-        truth_ens = qp.read(truth_file)
-        est_ens = qp.read(est_file)
-        
-        #plt.plot(grid, np.squeeze(truth_ens.pdf(grid)), color=colors[ibin], linestyle='dashed')
-        plt.plot(grid, np.squeeze(est_ens.pdf(grid)), color=colors[ibin])
-        
-    plt.grid()
-    return fig
-
-def compare_bins_all(selection, flavor, classifier, summarizer):
-    fig = plt.figure()
-    grid = np.linspace(0, 3., 301)
-    for ibin in range(5):
-        truth_file = truth_template.format(selection=selection, flavor=flavor, classifier=classifier, ibin=ibin)
-        est_file = est_template.format(selection=selection, flavor=flavor, classifier=classifier, summarizer=summarizer, ibin=ibin)
-        truth_ens = qp.read(truth_file)
-        est_ens = qp.read(est_file)
-        
-        plt.plot(grid, np.squeeze(truth_ens.pdf(grid)), color=colors[ibin], linestyle='dashed')
-        plt.plot(grid, np.squeeze(est_ens.pdf(grid)), color=colors[ibin])
-        
-    plt.grid()
-    components = flavor.split('_')
-    algorithm_name = components[0]
-    flavor_name = f"{components[2]}"
-    subdir_name = f"{components[1]}"
-
-    base_dir = 'resultsShare'
-    # Create the directory if it doesn't exist
-    dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
-    os.makedirs(dir_path, exist_ok=True)
-
-    # Save the figure
-    save_path = os.path.join(dir_path, "tomography.png")
-    plt.savefig(save_path)
-    return fig
-
-def tomographic_bias(selection, flavor, classifier='uniform_binning', summarizer='naive_stack'):
-    biases = []
-    bin_numbers = range(5)
-    for ibin in bin_numbers:
-        truth_file = truth_template.format(selection=selection, flavor=flavor, classifier=classifier, ibin=ibin)
-        est_file = est_template.format(selection=selection, flavor=flavor, classifier=classifier, summarizer=summarizer, ibin=ibin)
-        truth_ens = qp.read(truth_file)
-        est_ens = qp.read(est_file)
-        
-        truth_mean = np.mean(truth_ens.mean(), axis=0)
-        est_mean = np.mean(est_ens.mean(), axis=0)
-        
-        bias = truth_mean - est_mean
-        biases.append(bias)
-    
-    biases = np.array(biases).reshape(-1)
-    
-    fig, ax = plt.subplots()
-    ax.plot(bin_numbers, biases, marker='o')
-    ax.set_xlabel('Bin Number')
-    ax.set_ylabel('Bias (Delta n(z))')
-    ax.set_title(f'{flavor}: Bias within Bins')
-    ax.set_xticks(np.arange(1, 4 + 1, 1))
-    plt.grid()
-    components = flavor.split('_')
-    algorithm_name = components[0]
-
-    # Ensure components have the expected length
-    if len(components) == 3:
-        subdir_name = components[1]
-        flavor_name = components[2]
-    else:
-        raise ValueError("The flavor string does not match the expected format.")
-
-    base_dir = 'resultsShare'
-    # Create the directory if it doesn't exist, including subdir
-    dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
-    os.makedirs(dir_path, exist_ok=True)
-
-    # Save the figure
-    save_path = os.path.join(dir_path, "tomographicBias.png")
-    plt.savefig(save_path)
-    return fig, biases
-
-def compare_bins_separated(selection, flavor, classifier='uniform_binning', summarizer='naive_stack'):
-    fig, axs = plt.subplots(5, 1, figsize=(8, 20), sharex=True)
-    grid = np.linspace(0, 3., 301)
-    
-    for ibin, ax in enumerate(axs):
-        truth_file = truth_template.format(selection=selection, flavor=flavor, classifier=classifier, ibin=ibin)
-        est_file = est_template.format(selection=selection, flavor=flavor, classifier=classifier, summarizer=summarizer, ibin=ibin)
-        truth_ens = qp.read(truth_file)
-        est_ens = qp.read(est_file)
-        
-        ax.plot(grid, np.squeeze(truth_ens.pdf(grid)), color=colors[ibin], linestyle='dashed', label=f'Truth Bin {ibin}')
-        ax.plot(grid, np.squeeze(est_ens.pdf(grid)), color=colors[ibin], label=f'Est Bin {ibin}')
-        ax.grid()
-        ax.legend()
-        
-    #axs[-1].set_xlabel('Redshift')
-    #fig.supylabel('Density')
-    plt.tight_layout()
-    return fig
-
-def output_metric(testFile, flavor, selection, algorithm, band_name='LSST_obs_g'):
-    """
-    From output evaluate file, create plot of mean of values as a function of magnitude.
-    """
-    import numpy as np
-    import pandas as pd
-    from matplotlib import pyplot as plt
-    import qp
-
-    if isinstance(testFile, str):
-        testFile = convert_df(testFile)
-
-    outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_evaluate_{algorithm}.hdf5'
-
-    #outputFile = qp.read(outputFile_path)
-    outputFile = convert_df(outputFile_path)
-
-    testFile['output_point_stats_ez_zmode_redshift'] = np.squeeze(outputFile['point_stats_ez_zmode_redshift'])
-
-    bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
-    testFile["band_bin"] = pd.cut(testFile[band_name], bins)
-
-    mean_values = testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean()
-
-    plt.plot(bins[:-1], mean_values, marker='o', label=f'{algorithm} - {flavor}')
-    plt.xlabel(f"{band_name}")
-    plt.ylabel("output_point_stats_ez_zmode_redshift")
-    components = flavor.split('_')
-    algorithm_name = components[0]
-
-    if len(components) == 3:
-        subdir_name = components[1]
-        flavor_name = components[2]
-    else:
-        raise ValueError("The flavor string does not match the expected format.")
-
-    base_dir = 'resultsShare'
-    dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
-    os.makedirs(dir_path, exist_ok=True)
-
-    save_path = os.path.join(dir_path, "outputMetric.png")
-    plt.title(f"{algorithm_name}: {flavor} Output Metric")
-    plt.grid()
-    y_min = min(mean_values.min(), -mean_values.max())
-    y_max = max(mean_values.max(), -mean_values.min())
-    plt.ylim(y_min, y_max)
-
-    plt.axhline(0, color='black', linewidth=0.8)
-    
-    plt.legend()
-    plt.savefig(save_path)
-    plt.show()
-
-def output_metric2(testFile, flavors, selection, algorithms, band_name='LSST_obs_g'):
-    """
-    From output evaluate file, create plot of mean of values as a function of magnitude.
-    """
-    if isinstance(testFile, str):
-        testFile = convert_df(testFile)
-    
-    bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
-    testFile["band_bin"] = pd.cut(testFile[band_name], bins)
-    
-    plt.figure(figsize=(10, 6))
-    
-    for flavor, algorithm in zip(flavors, algorithms):
-        outputFile_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_evaluate_{algorithm}.hdf5'
-        print(f"Checking file: {outputFile_path}")
-
-        if not os.path.exists(outputFile_path):
-            print(f"File not found: {outputFile_path}")
-            continue
-        
-        outputFile = convert_df(outputFile_path)
-        print(f"Columns in output file: {outputFile.columns}")
-
-        if 'point_stats_ez_zmode_redshift' not in outputFile.columns:
-            print(f"Column 'point_stats_ez_zmode_redshift' not found in file: {outputFile_path}")
-            continue
-
-        testFile['output_point_stats_ez_zmode_redshift'] = np.squeeze(outputFile['point_stats_ez_zmode_redshift'])
-        mean_values = testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean()
-        print(f"Mean values for {algorithm} - {flavor}: {mean_values}")
-
-        plt.plot(bins[:-1], mean_values, marker='o', label=f'{algorithm} - {flavor}')
-
-    plt.xlabel(f"{band_name}")
-    plt.ylabel("output_point_stats_ez_zmode_redshift")
-
-    plt.title(f"Output Metric for Multiple Algorithms and Flavors")
-    plt.grid()
-    plt.axhline(0, color='black', linewidth=0.8)
-    plt.legend()
-
-    try:
-        y_min = min(testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean().min(), 
-                    -testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean().max())
-        y_max = max(testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean().max(), 
-                    -testFile.groupby('band_bin')['output_point_stats_ez_zmode_redshift'].mean().min())
-        plt.ylim(y_min, y_max)
-    except KeyError as e:
-        print(f"Error in calculating y-axis limits: {e}")
-
-    base_dir = 'resultsShare'
-    algorithm_name = '_'.join(algorithms)
-    flavor_name = '_'.join(flavors)
-    subdir_name = selection
-
-    # Create the directory if it doesn't exist, including subdir
-    dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
-    os.makedirs(dir_path, exist_ok=True)
-
-    # Save the figure
-    save_path = os.path.join(dir_path, "outputMetric.png")
-    plt.savefig(save_path)
-    plt.show()
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-
-def all(testFile, flavor, selection, algorithm, summarizer='point_est_hist', band_name='LSST_obs_g', threshold=0.05, tom_option='all'):
-    """
-    Run the pipeline with the specified options.
-    
-    Arguments:
-    testFile -- Path to the test file
-    flavor -- The flavor to use
-    selection -- The selection to use
-    algorithm -- The algorithm to use
-    band_name -- The band name to use
-    threshold -- The threshold to use for analyze_output (default 0.05)
-    tom_option -- The option to choose for compare_bins ('all', 'est', 'true', 'separated')
-    
-    Returns:
-    A list of figures
-    """
-    classifier = f'{algorithm}_uniform_binning'
-    figures = []
-
-    fig5 = output_metric(testFile, flavor, selection, algorithm)
-    figures.append(fig5)
-    
-    fig1 = zrelation(testFile, flavor, selection, algorithm)
-    figures.append(fig1)
-    
-    fig2 = analyze_output(testFile, [flavor], selection, algorithm, band_name, threshold)
-    figures.append(fig2)
-    
-    if tom_option == 'all':
-        fig3 = compare_bins_all(selection, flavor, classifier, summarizer)
-    elif tom_option == 'est':
-        fig3 = compare_bins_est(selection, flavor, classifier, summarizer)
-    elif tom_option == 'true':
-        fig3 = compare_bins_true(selection, flavor, classifier, summarizer)
-    elif tom_option == 'separated':
-        fig3 = compare_bins_separated(selection, flavor, classifier, summarizer)
-    figures.append(fig3)
-
-    fig4 = tomographic_bias(selection, flavor, classifier, summarizer)
-
-    figures.append(fig4)
-    
-    return figures
-
