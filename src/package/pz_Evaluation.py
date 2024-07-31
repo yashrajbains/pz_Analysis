@@ -11,13 +11,14 @@ import h5py
 
 def algorithm_flavor(flavor):
     """
-    Extract the algorithm name from the flavor string.
+    Extract the algorithm name from the flavor string. 
+    Necessary due to the flavor naming conventions I used: {algorithm}_{flavorConfigs}_{specSelection}
     """
     prefix = flavor.split('_')[0]
     return 'fzboost' if prefix == 'fzb' else prefix
 
 def convert_df(testFile):
-    """Convert testFile path to pandas DataFrame"""
+    """Convert string testFile path to pandas DataFrame"""
 
     def convert_ordereddict_to_dataframe(odict):
         """Convert nested OrderedDict to pandas DataFrame"""
@@ -52,7 +53,7 @@ def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     Create p(z) ensemble from sompz output files. Save to path for compatibility with functions. 
     - testFile - string. Path to testing file used.
     - flavor - string. Flavor name
-    - selection - string. Selection used
+    - selection - string. Selection used (i.e. 'maglim_25.5')
     """
     widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
     pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
@@ -64,6 +65,7 @@ def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
 
     grid = np.linspace(zmin, zmax, nzbins)
 
+    # Initialize list to store estimated redshifts
     with h5py.File(pz_chat_path, 'r') as f:
         pz_chat_data = f['pz_chat']
         estimated_redshifts = []
@@ -73,12 +75,15 @@ def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
             estimated_redshifts.append(estimated_redshift)
         testing['estimated_redshift'] = estimated_redshifts
         estimated_redshifts = np.array(estimated_redshifts)
-    
+
+    # Reshape array to 2D 
     if estimated_redshifts.ndim == 1:
         estimated_redshifts = estimated_redshifts[:, np.newaxis]
 
+    # Redshift grid for histograms
     z_grid = np.linspace(zmin, zmax, nzbins)
 
+    # Create histograms for each estimated redshift pdf
     histograms = []
     for redshift in estimated_redshifts:
         hist, _ = np.histogram(redshift, bins=z_grid, density=True)
@@ -86,10 +91,14 @@ def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
 
     histograms = np.array(histograms)
 
+    # Create ensemble
     ensemble = qp.Ensemble(gen_func=qp.hist, data=dict(bins=z_grid, pdfs=histograms))
 
+    # Assign zmode values for each object 
     zmode_values = estimated_redshifts.max(axis=1)
     ensemble.set_ancil(dict(zmode=zmode_values))
+
+    # Saving the ensemble to the path expected by other functions
     ensemble.write_to(f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_som.hdf5')
     
     return ensemble
@@ -97,6 +106,9 @@ def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
 def zrelation(testFile, flavor, selection):
     """
     2-D Histogram: Estimated Redshift vs True Redshift
+    - testFile - string. Path to testing file used
+    - flavor - string. Flavor name
+    - selection - string. Selection used (i.e. 'maglim_25.5')
     """
     reference = convert_df(testFile)
 
@@ -137,6 +149,11 @@ def zrelation(testFile, flavor, selection):
 def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05):
     """
     Redshift Estimator Accuracy vs Mag for multiple flavors/algorithms 
+    - testFile - string. Path to testing file used
+    - flavors - list. Flavor names
+    - selection - string. Selection used (i.e. 'maglim_25.5')
+    - band_name - string, optional. Column name for color filter, default is g band. 
+    - threshold - float, optional. Threshold for accuracy calculation. Default is 0.05
     """
     if isinstance(flavors, str):
         flavors = [flavors]
@@ -145,11 +162,13 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
 
     testFile = convert_df(testFile)
 
+    # Creating magnitude bins. I used variable bin sizes due to the magnitude distribution in the testing file 
     bins = (17, 20, 21, 22, 23, 23.5, 24, 24.5, 25, 25.5, 26, 26.5, 27, 30)
     testFile["band_bin"] = pd.cut(testFile[band_name], bins)
     
     plt.figure(figsize=(10, 6))
 
+    # If the algorithm is a SOM, we first need to extract p(z) estimates. This may be unnecessary due to the createEnsemble function. Will update.
     for flavor, algorithm in zip(flavors, algorithms):
         if algorithm == 'som':
             wide_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
@@ -188,12 +207,13 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
         else:
             file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
             outputFile = qp.read(file_path)
-            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
+            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode']) # Assign estimated redshift to testFile
 
+        # Calculate accuracy. Accuracy is the fraction of estimates within the magnitude bin with a bias within the threshold 
         accuracy = testFile.groupby('band_bin').apply(
             lambda x: np.mean(np.abs(x['redshift'] - x['estimated_redshift']) <= threshold)
         )
-        error = np.sqrt(accuracy * (1 - accuracy) / testFile['band_bin'].value_counts())
+        error = np.sqrt(accuracy * (1 - accuracy) / testFile['band_bin'].value_counts()) # 
         plt.errorbar(bins[:-1], accuracy, yerr=error, capsize=5, label=flavor)
 
         components = flavor.split('_')
@@ -227,7 +247,13 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
 
 def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     """
-    Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms 
+    Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms
+    - testFile - string. Path to testing file used
+    - flavors - list. Flavor names
+    - selection - string. Selection used (i.e. 'maglim_25.5')
+    - band_name - string, optional. Column name for color filter, default is g band. 
+    - threshold - float, optional. Threshold for accuracy calculation. Default is 0.05
+    - color - string, optional. Color is calculated from string and used for analysis. Default is g-i 
     """
 
     algorithms = [algorithm_flavor(flavor) for flavor in flavors]
@@ -291,6 +317,11 @@ def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
 def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05, frac=0.1):
     """
     Plot r-i vs g-r, Filter dataset to points with bias greater than threshold. Downsample remaining dataset by frac. 
+    - testFile - string. Path to testing file used
+    - flavors - list. Flavor names
+    - selection - string. Selection used (i.e. 'maglim_25.5')
+    - band_name - string, optional. Column name for color filter, default is g band. 
+    - threshold - float, optional. Threshold for accuracy calculation. Default is 0.05
     """
     import numpy as np
     import pandas as pd
@@ -363,7 +394,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     - 'good': both algorithms have a bias below threshold
     - 'poor': both algorithms have a bias above threshold
     
-    Also plots the contour of the unfiltered data
+    Contour of unfiltered data is plotted for comparison 
     """
     import numpy as np
     import pandas as pd
@@ -417,7 +448,7 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     x = testFile['g-r']
     y = testFile['r-i']
     
-    k = gaussian_kde([x, y], bw_method=0.3)  # Adjust bandwidth here
+    k = gaussian_kde([x, y], bw_method=0.3)
     xi, yi = np.mgrid[x.min():x.max():200j, y.min():y.max():200j]
     zi = k(np.vstack([xi.flatten(), yi.flatten()]))
     
