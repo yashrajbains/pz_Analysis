@@ -50,6 +50,9 @@ def convert_df(testFile):
 def createEnsemble(testFile, flavor, selection, zmin=0, zmax=6, nzbins=601):
     """
     Create p(z) ensemble from sompz output files. Save to path for compatibility with functions. 
+    - testFile - string. Path to testing file used.
+    - flavor - string. Flavor name
+    - selection - string. Selection used
     """
     widepath = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
     pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
