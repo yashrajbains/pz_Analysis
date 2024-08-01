@@ -485,7 +485,7 @@ def runTime(flavor, selection, stage='estimator'):
     - selection - string. Selection used
     - stage - string. 'estimator' 'informer' 'all' 
     """
-    algorithm = yf.algorithm_flavor(flavor)
+    algorithm = algorithm_flavor(flavor)
     
     if stage == 'estimator':
         filePath = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/logs/estimate_{algorithm}.out'
