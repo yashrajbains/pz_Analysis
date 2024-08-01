@@ -460,3 +460,65 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     ax.grid()
     ax.legend()
     plt.show()
+
+def extractTime(filePath):
+    if not os.path.exists(filePath):
+        return None, f"Log file {filePath} does not exist."
+
+    with open(filePath, 'r') as file:
+        lines = file.readlines()
+        if lines:
+            last_line = lines[-1].strip()
+            if "took" in last_line:
+                time = float(last_line.split("took")[-1].strip().split()[0])
+                stage = last_line.split(":")[1].strip().split(" ")[0]
+                return time, stage
+            else:
+                return None, "Time information not found in the last line of the log file."
+        else:
+            return None, "Log file is empty."
+
+def runTime(flavor, selection, stage='estimator'):
+    """
+    Return runtime for algorithm stage. 
+    - flavor - string. Flavor name
+    - selection - string. Selection used
+    - stage - string. 'estimator' 'informer' 'all' 
+    """
+    algorithm = yf.algorithm_flavor(flavor)
+    
+    if stage == 'estimator':
+        filePath = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/logs/estimate_{algorithm}.out'
+        time, stage = extractTime(filePath)
+        if time is not None:
+            return f"{stage} took {time:.2f} minutes"
+        else:
+            return stage
+    
+    elif stage == 'informer':
+        filePath = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/logs/inform_{algorithm}.out'
+        time, stage = extractTime(filePath)
+        if time is not None:
+            return f"{stage} took {time:.2f} minutes"
+        else:
+            return stage
+
+    elif stage == 'all':
+        estimator_log = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/logs/estimate_{algorithm}.out'
+        informer_log = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/logs/inform_{algorithm}.out'
+        
+        estimator_time, estimator_stage = extractTime(estimator_log)
+        informer_time, informer_stage = extractTime(informer_log)
+        
+        if estimator_time is not None and informer_time is not None:
+            total_time = estimator_time + informer_time
+            return f"Total time for {estimator_stage} and {informer_stage} took {total_time:.2f} minutes"
+        elif estimator_time is None:
+            return estimator_stage
+        elif informer_time is None:
+            return informer_stage
+        else:
+            return "Both logs are missing or empty."
+    
+    else:
+        raise ValueError("Invalid stage. Please use 'estimator', 'informer', or 'all'.")
