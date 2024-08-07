@@ -9,6 +9,8 @@ from collections import OrderedDict
 import qp
 import h5py
 
+testFile=None
+
 def algorithm_flavor(flavor):
     """
     Extract the algorithm name from the flavor string. 
