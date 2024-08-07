@@ -146,7 +146,7 @@ def zrelation(testFile, flavor, selection):
     plt.savefig(save_path)
     plt.show()
 
-def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=0.05):
+def accuracyMag(flavors, testFile=testFile, selection='maglim_25.5', band_name='LSST_obs_g', threshold=0.05):
     """
     Redshift Estimator Accuracy vs Mag for multiple flavors/algorithms 
     - testFile - string. Path to testing file used
@@ -168,14 +168,19 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
     
     plt.figure(figsize=(10, 6))
 
-    # If the algorithm is a SOM, we first need to extract p(z) estimates. This may be unnecessary due to the createEnsemble function. Will update.
     for flavor, algorithm in zip(flavors, algorithms):
+        components = flavor.split('_')
+        if components[1] == 'romanrubin':
+            file_path = f'/sdf/data/rubin/shared/pz/projects/roman_plus_rubin/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+        else:
+            file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+
         if algorithm == 'som':
-            wide_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
+            wide_path = f'/sdf/data/rubin/shared/pz/roman_plus_rubin/data/{selection}_{flavor}/wide_data_assignment_estimate_sompz.hdf5'
             wide = convert_df(wide_path)
             testFile['cells'] = wide['cells']
 
-            pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_rubin_2023/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
+            pz_chat_path = f'/sdf/data/rubin/shared/pz/roman_plus_rubin/data/{selection}_{flavor}/pz_chat_estimate_sompz.hdf5'
             grid = np.linspace(0, 6, 601)
             estimated_redshifts = []
 
@@ -205,36 +210,32 @@ def accuracyMag(testFile, flavors, selection, band_name='LSST_obs_g', threshold=
 
             testFile['estimated_redshift'] = np.squeeze(ensemble.ancil['zmode'])
         else:
-            file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
             outputFile = qp.read(file_path)
-            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode']) # Assign estimated redshift to testFile
+            testFile['estimated_redshift'] = np.squeeze(outputFile.ancil['zmode'])
 
         # Calculate accuracy. Accuracy is the fraction of estimates within the magnitude bin with a bias within the threshold 
         accuracy = testFile.groupby('band_bin').apply(
             lambda x: np.mean(np.abs(x['redshift'] - x['estimated_redshift']) <= threshold)
         )
-        error = np.sqrt(accuracy * (1 - accuracy) / testFile['band_bin'].value_counts()) # 
+        error = np.sqrt(accuracy * (1 - accuracy) / testFile['band_bin'].value_counts())
         plt.errorbar(bins[:-1], accuracy, yerr=error, capsize=5, label=flavor)
 
-        components = flavor.split('_')
+        # Directory path 
         algorithm_name = components[0]
-
-        if len(components) == 3:
-            subdir_name = components[1]
-            flavor_name = components[2]
-        else:
-            raise ValueError("The flavor string does not match the expected format.")
+        subdir_name = components[1]
+        flavor_name = components[2]
 
         base_dir = 'resultsShare'
         dir_path = os.path.join(base_dir, algorithm_name, flavor_name, subdir_name)
         os.makedirs(dir_path, exist_ok=True)
 
-        plt.xlabel(f"Magnitude: {band_name}")
-        plt.ylabel("Redshift Estimator Accuracy")
-        #plt.title(f"Comparing {algorithm} Flavors")
-        plt.grid()
-        plt.legend()
-        plt.ylim(0,1)
+    plt.xlabel(f"Magnitude: {band_name}")
+    plt.ylabel("Redshift Estimator Accuracy")
+    plt.grid()
+    plt.legend()
+    plt.ylim(0, 1)
+    plt.show()
+
 
     plt.xlabel(f"Magnitude: {band_name}")
     plt.ylabel("Redshift Estimator Accuracy")
