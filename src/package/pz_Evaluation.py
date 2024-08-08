@@ -8,6 +8,12 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
+from rail.utils.path_utils import find_rail_file
+from rail.core.data import QPHandle, TableHandle
+from rail.core.stage import RailStage
+from qp.metrics.pit import PIT
+from utils import plot_pit_qq, ks_plot
+
 
 testFile=None
 
@@ -525,3 +531,27 @@ def runTime(flavor, selection, stage='estimator'):
     
     else:
         raise ValueError("Invalid stage. Please use 'estimator', 'informer', or 'all'.")
+
+
+
+def pit_qq(flavor, selection = 'maglim_25.5'):
+    algorithm = algorithm_flavor(flavor)
+
+    components = flavor.split('_')
+
+    if components[1] == 'romanrubin':
+        ztrue_file = '/sdf/data/rubin/shared/pz/data/test/roman_plus_rubin_maglim_25.5_baseline_100k.hdf5'
+        pdfs_file = f'/sdf/data/rubin/shared/pz/projects/roman_plus_rubin/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+    else:
+        ztrue_file = '/sdf/data/rubin/shared/pz/data/test/roman_rubin_2023_maglim_25.5_baseline_100k.hdf5'
+        pdfs_file = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
+
+    data = DS.read_file('pdfs_data', QPHandle, pdfs_file)
+    ztrue_data = DS.read_file('ztrue_data', TableHandle, ztrue_file)
+
+    ztrue = ztrue_data()['redshift']
+
+    zgrid = np.linspace(0,3,121)
+    pdfs = data.data.pdf(zgrid)
+
+    plot_pit_qq(pdfs, zgrid, ztrue)
