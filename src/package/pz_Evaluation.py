@@ -8,7 +8,6 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
-from rail.utils.path_utils import find_rail_file
 from rail.core.data import QPHandle, TableHandle
 from rail.core.stage import RailStage
 from qp.metrics.pit import PIT
