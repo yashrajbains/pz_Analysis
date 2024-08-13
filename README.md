@@ -1,6 +1,6 @@
 # pz_analysis
 
-This repository contains a Python package allowing for streamlined evaluation of RAIL photometric redshift estimation outputs. Evaluations focus on comparing the performance of differnet algorithms using simulated galaxy catalog. 
+This repository contains a Python package allowing for streamlined evaluation of RAIL photometric redshift estimation outputs. Evaluations focus on comparing the performance of different algorithms using simulated galaxy catalog. 
 
 ## Project Structure
 
