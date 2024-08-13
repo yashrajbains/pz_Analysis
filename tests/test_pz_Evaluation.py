@@ -1,5 +1,6 @@
 import pytest
-import pz_Evaluation as yf
+from package import pz_Evaluation as yf
+
 
 def test_algorithm_flavor():
     assert yf.algorithm_flavor('fzb_base_base') == 'fzboost'
