@@ -4,10 +4,7 @@ This repository contains a Python package allowing for streamlined evaluation of
 
 ## Project Structure
 
-- `data/`: Contains data files used for testing and analysis.
-- `notebooks/`: Jupyter notebooks for exploratory data analysis.
-- `scripts/`: Python scripts for running experiments and analyzing results.
-- `tests/`: Unit tests for ensuring code quality and functionality.
+- `src/`: Source code for the functions related to photometric redshift output evaluation.
 
 
 [![Template](https://img.shields.io/badge/Template-LINCC%20Frameworks%20Python%20Project%20Template-brightgreen)](https://lincc-ppt.readthedocs.io/en/latest/)
