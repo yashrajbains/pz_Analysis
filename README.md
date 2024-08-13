@@ -1,5 +1,15 @@
 # pz_analysis
 
+This repository contains a Python package allowing for streamlined evaluation of RAIL photometric redshift estimation outputs. Evaluations focus on comparing the performance of differnet algorithms using simulated galaxy catalog. 
+
+## Project Structure
+
+- `data/`: Contains data files used for testing and analysis.
+- `notebooks/`: Jupyter notebooks for exploratory data analysis.
+- `scripts/`: Python scripts for running experiments and analyzing results.
+- `tests/`: Unit tests for ensuring code quality and functionality.
+
+
 [![Template](https://img.shields.io/badge/Template-LINCC%20Frameworks%20Python%20Project%20Template-brightgreen)](https://lincc-ppt.readthedocs.io/en/latest/)
 [![codecov](https://codecov.io/gh/LSSTDESC/pz_analysis/branch/main/graph/badge.svg)](https://codecov.io/gh/LSSTDESC/pz_analysis)
 [![PyPI](https://img.shields.io/pypi/v/pz_analysis?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/pz_analysis/)
