@@ -8,7 +8,7 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
-from utils import plot_pit_qq, ks_plot
+#from utils import plot_pit_qq, ks_plot
 
 
 testFile=None
