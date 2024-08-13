@@ -22,7 +22,8 @@ dependencies = [
     "pandas",
     "tables_io",
     "h5py",
-    "qp-prob"]
+    "qp-prob",
+    "utils"]
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
