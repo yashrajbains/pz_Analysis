@@ -16,7 +16,12 @@ classifiers = [
 ]
 dynamic = ["version"]
 
-dependencies = ["matplotlib"]
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "tables_io",
+    "h5py"]
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
