@@ -35,7 +35,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "src/pz_Analysis/_version.py"
+write_to = "src/package/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = [
