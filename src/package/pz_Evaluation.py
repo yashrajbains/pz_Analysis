@@ -8,9 +8,6 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
-from rail.core.data import QPHandle, TableHandle
-from rail.core.stage import RailStage
-from qp.metrics.pit import PIT
 from utils import plot_pit_qq, ks_plot
 
 
@@ -331,13 +328,6 @@ def colorspaceBias(testFile, flavors, selection, band_name='LSST_obs_g', thresho
     - band_name - string, optional. Column name for color filter, default is g band. 
     - threshold - float, optional. Threshold for accuracy calculation. Default is 0.05
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    from rail.utils import catalog_utils
-    from rail.core.stage import RailStage
-    import tables_io
     from matplotlib.colors import Normalize, LinearSegmentedColormap
 
     algorithm = algorithm_flavor(flavors)
@@ -404,13 +394,6 @@ def colorspaceCompare(testFile, flavors, selection, band_name='LSST_obs_g', thre
     
     Contour of unfiltered data is plotted for comparison 
     """
-    import numpy as np
-    import pandas as pd
-    import qp
-    from matplotlib import pyplot as plt
-    from rail.utils import catalog_utils
-    from rail.core.stage import RailStage
-    import tables_io
     from scipy.stats import gaussian_kde
 
     algorithms = [algorithm_flavor(flavor) for flavor in flavors]
