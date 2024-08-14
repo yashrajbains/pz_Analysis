@@ -8,7 +8,7 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
-from rail.core.stange import RailStage
+from rail.core.stage import RailStage
 #from utils import plot_pit_qq, ks_plot
 
 
