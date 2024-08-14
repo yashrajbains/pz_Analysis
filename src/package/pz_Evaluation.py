@@ -8,6 +8,7 @@ import tables_io
 from collections import OrderedDict
 import qp
 import h5py
+from rail.core.stange import RailStage
 #from utils import plot_pit_qq, ks_plot
 
 
@@ -517,6 +518,8 @@ def runTime(flavor, selection, stage='estimator'):
 
 
 def pit_qq(flavor, selection = 'maglim_25.5'):
+    DS = RailStage.data_store
+    DS.__class__.allow_overwrite = True
     algorithm = algorithm_flavor(flavor)
 
     components = flavor.split('_')
