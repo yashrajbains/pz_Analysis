@@ -10,7 +10,7 @@ import qp
 import h5py
 from rail.core.stage import RailStage
 from rail.core.data import QPHandle, TableHandle
-#from utils import plot_pit_qq, ks_plot
+from utils import plot_pit_qq
 
 
 testFile=None
