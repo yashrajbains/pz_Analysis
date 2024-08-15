@@ -242,16 +242,6 @@ def accuracyMag(flavors, testFile=testFile, selection='maglim_25.5', band_name='
     plt.ylim(0, 1)
     plt.show()
 
-
-    plt.xlabel(f"Magnitude: {band_name}")
-    plt.ylabel("Redshift Estimator Accuracy")
-    #plt.title(f"Comparing Different Flavors and Algorithms")
-    plt.grid()
-    plt.legend()
-    plt.ylim(0,1)
-    plt.show()
-
-
 def accuracyColor(reference, flavors, selection, threshold=0.05, color='g-i'):
     """
     Redshift Estimator Accuracy vs g-i color for multiple flavors/algorithms
