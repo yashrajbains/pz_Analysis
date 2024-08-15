@@ -176,7 +176,7 @@ def accuracyMag(flavors, testFile=testFile, selection='maglim_25.5', band_name='
 
     for flavor, algorithm in zip(flavors, algorithms):
         components = flavor.split('_')
-        if components[1] == 'romanrubin':
+        if components[1].startswith('romanrubin'):
             file_path = f'/sdf/data/rubin/shared/pz/projects/roman_plus_rubin/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
         else:
             file_path = f'/sdf/data/rubin/shared/pz/projects/roman_rubin_2023/data/{selection}_{flavor}/output_estimate_{algorithm}.hdf5'
